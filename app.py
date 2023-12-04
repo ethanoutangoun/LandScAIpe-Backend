@@ -5,6 +5,15 @@ import io
 import base64
 import os
 
+import json
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from bs4 import BeautifulSoup
+
+
 app = Flask(__name__)
 CORS(app)
 
@@ -68,5 +77,63 @@ def process_image():
     except Exception as e:
         print(e)
         return jsonify({'error': str(e)})
+
+
+@app.route('/api/nativeplants/<zipcode>', methods=['GET'])
+def getNativePlants(zipcode):
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+
+    
+    url = f'https://www.audubon.org/native-plants/search?zipcode={zipcode}'
+
+    driver = webdriver.Chrome(options=chrome_options)
+    driver.get(url)
+    data = []
+
+   
+
+    while True:
+        WebDriverWait(driver, 5).until(EC.presence_of_all_elements_located((By.CLASS_NAME, "custom-h3")))
+        page_source = driver.page_source
+        soup = BeautifulSoup(page_source, 'html.parser')
+
+
+        custom_h3_tags = soup.find_all('h2', class_='custom-h3')
+        latin_names = soup.find_all('h3', class_='scientific-title custom-h4')
+        tier_1_descriptions = soup.find_all('div', class_='tier-1-plant--description')
+        plant_images = soup.find_all('button', class_='tier-1-plant-picture-modal cboxElement')
+
+        for plant,latin, description, plant_image in zip(custom_h3_tags, latin_names, tier_1_descriptions, plant_images):
+            # print(f"Plant: {plant.text.strip()} ({latin.text.strip()})")
+            # print(f"Description: {description.text.strip()}\n")
+            # print(f"Image: {plant_image['data-href']}\n")
+
+            plant_data = {
+                "Plant": plant.text.strip(),
+                "Latin Name": latin.text.strip(),
+                "Description": description.text.strip(),
+                "Image": plant_image['data-href']
+            }
+
+            data.append(plant_data)
+        
+        try:
+            next_button = driver.find_element(By.XPATH, "//a[@title='Go to next page' and @rel='next']")
+            driver.execute_script("arguments[0].click();", next_button)
+        except:
+            break
+
+ 
+
+    
+    driver.quit()
+
+    return jsonify(data)
+
+
+
+
+
 if __name__ == '__main__':
     app.run(debug=True, host='localhost', port=8000)
