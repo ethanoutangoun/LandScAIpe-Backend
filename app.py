@@ -81,53 +81,16 @@ def process_image():
 
 @app.route('/api/nativeplants/<zipcode>', methods=['GET'])
 def getNativePlants(zipcode):
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
+    with open('db.json', 'r') as f:
+        data = json.load(f)
+
+    zipcode_data = data.get(str(zipcode))
+    if zipcode_data:
+        return jsonify(zipcode_data)
+    else:
+        return jsonify({"error": "No plant info found for this zipcode."}), 404
 
     
-    url = f'https://www.audubon.org/native-plants/search?zipcode={zipcode}'
-
-    driver = webdriver.Chrome(options=chrome_options)
-    driver.get(url)
-    data = []
-
-   
-
-    
-    WebDriverWait(driver, 3).until(EC.presence_of_all_elements_located((By.CLASS_NAME, "custom-h3")))
-    page_source = driver.page_source
-    soup = BeautifulSoup(page_source, 'html.parser')
-
-
-    custom_h3_tags = soup.find_all('h2', class_='custom-h3')
-    latin_names = soup.find_all('h3', class_='scientific-title custom-h4')
-    tier_1_descriptions = soup.find_all('div', class_='tier-1-plant--description')
-    plant_images = soup.find_all('button', class_='tier-1-plant-picture-modal cboxElement')
-
-    for plant,latin, description, plant_image in zip(custom_h3_tags, latin_names, tier_1_descriptions, plant_images):
-        # print(f"Plant: {plant.text.strip()} ({latin.text.strip()})")
-        # print(f"Description: {description.text.strip()}\n")
-        # print(f"Image: {plant_image['data-href']}\n")
-
-        plant_data = {
-            "Plant": plant.text.strip(),
-            "Latin Name": latin.text.strip(),
-            "Description": description.text.strip(),
-            "Image": plant_image['data-href']
-        }
-
-        data.append(plant_data)
-    
-      
-
- 
-
-    
-    driver.quit()
-
-    return jsonify(data)
-
-
 
 
 
